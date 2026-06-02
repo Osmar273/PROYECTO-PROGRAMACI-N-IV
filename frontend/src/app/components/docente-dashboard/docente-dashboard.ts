@@ -1,10 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { DocenteService } from '../../services/docente';
 import { ToastService } from '../../services/toast';
+
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 @Component({
   selector: 'app-docente-dashboard',
@@ -16,19 +19,26 @@ import { ToastService } from '../../services/toast';
 export class DocenteDashboard implements OnInit {
   vistaActual: string = 'mis-grupos';
   usuarioActual: any = null;
-  sidebarAbierto = false;
+  sidebarAbierto: boolean = false;
 
-  materias: any[] = []; todosLosGrupos: any[] = []; misGrupos: any[] = [];
+  materias: any[] = []; misGrupos: any[] = [];
   estudiantes: any[] = []; inscripciones: any[] = [];
+  aulas: any[] = []; 
   grupoSeleccionado: any = null; listaAlumnosGrupo: any[] = [];
-
-  // Datos para el perfil
-  perfilEdit = { direccion: '', telefonoEmergencia: '', telefono: '' }; // telefono no se usa en docente, pero previene errores
+  evaluacionesGrupo: any[] = [];
+  nuevaEval: any = { id_grupo: 0, nombre: '', fecha: '', peso: 0 };
+  perfilEdit: any = { direccion: '', telefonoEmergencia: '', telefono: '' };
   archivoFoto: File | null = null;
 
-  constructor(private router: Router, private docenteService: DocenteService, private toast: ToastService, private http: HttpClient) {}
+  constructor(
+    private router: Router, 
+    private docenteService: DocenteService, 
+    private toast: ToastService, 
+    private cdr: ChangeDetectorRef, 
+    private http: HttpClient
+  ) {}
 
-  ngOnInit() {
+  ngOnInit(): void {
     const userStr = localStorage.getItem('usuario_actual');
     if (userStr) {
       this.usuarioActual = JSON.parse(userStr);
@@ -40,78 +50,132 @@ export class DocenteDashboard implements OnInit {
     }
   }
 
-  toggleSidebar() { this.sidebarAbierto = !this.sidebarAbierto; }
-  cambiarVista(vista: string) { this.vistaActual = vista; this.sidebarAbierto = false; }
-  cerrarSesion() { localStorage.removeItem('usuario_actual'); this.router.navigate(['/login']); }
+  toggleSidebar(): void { this.sidebarAbierto = !this.sidebarAbierto; this.cdr.detectChanges(); }
+  cambiarVista(vista: string): void { this.vistaActual = vista; this.sidebarAbierto = false; this.cdr.detectChanges(); }
+  cerrarSesion(): void { localStorage.removeItem('usuario_actual'); this.router.navigate(['/login']); }
 
-  cargarDatosDocente() {
-    this.docenteService.getMaterias().subscribe(mat => {
+  cargarDatosDocente(): void {
+    this.http.get<any[]>('http://127.0.0.1:8000/api/aulas').subscribe((a: any[]) => { this.aulas = a; });
+    this.docenteService.getMaterias().subscribe((mat: any[]) => {
       this.materias = mat;
-      this.docenteService.getGrupos().subscribe(grupos => {
-        this.misGrupos = grupos.filter(g => g.id_docente === this.usuarioActual.id_usuario).map(g => {
-            const materia = this.materias.find(m => m.id_materia === g.id_materia);
-            return { ...g, nombreMateria: materia ? materia.nombre : '', codigoMateria: materia ? materia.codigo : '' };
-          });
+      this.docenteService.getGrupos().subscribe((grupos: any[]) => {
+        this.misGrupos = grupos.filter((g: any) => Number(g.id_docente) === Number(this.usuarioActual.id_usuario));
+        this.cdr.detectChanges();
       });
     });
-    this.docenteService.getEstudiantes().subscribe(est => this.estudiantes = est);
-    this.docenteService.getInscripciones().subscribe(ins => this.inscripciones = ins);
+    this.docenteService.getEstudiantes().subscribe((est: any[]) => { this.estudiantes = est; });
+    this.docenteService.getInscripciones().subscribe((ins: any[]) => { this.inscripciones = ins; });
   }
 
-  abrirCalificador(grupo: any) {
+  getNombreAula(idAula: number): string { const au = this.aulas.find((a: any) => a.id_aula === idAula); return au ? au.nombre : 'Sin Aula'; }
+  get pesoTotal(): number { return this.evaluacionesGrupo.reduce((acc: number, ev: any) => acc + ev.peso, 0); }
+
+  abrirCalificador(grupo: any): void {
     this.grupoSeleccionado = grupo;
-    const inscripcionesDelGrupo = this.inscripciones.filter(ins => ins.id_grupo === grupo.id_grupo);
-    this.listaAlumnosGrupo = inscripcionesDelGrupo.map(ins => {
-      const estudiante = this.estudiantes.find(e => e.id_usuario === ins.id_estudiante);
-      return { ...ins, codEstudiante: estudiante ? estudiante.codEstudiante : 'N/A', nombresEstudiante: estudiante ? `${estudiante.nombres} ${estudiante.apellidos}` : 'Desconocido', notaFinalInput: ins.nota || 0 };
-    });
-    this.cambiarVista('calificador');
-  }
-
-  guardarNota(alumno: any) {
-    if (alumno.notaFinalInput < 0 || alumno.notaFinalInput > 100) return this.toast.warning('La nota debe estar entre 0 y 100.');
-    const estadoAprobacion = alumno.notaFinalInput >= 51 ? 'Aprobado' : 'Reprobado';
-    
-    this.docenteService.actualizarEstadoInscripcion(alumno.id_inscripcion, { estado: estadoAprobacion }).subscribe({
-      next: () => {
-        alumno.estado = estadoAprobacion;
-        const payloadNota = { id_inscripcion: alumno.id_inscripcion, nota: alumno.notaFinalInput, observacion: 'Nota Final' };
-        this.docenteService.guardarNotaFinal(payloadNota).subscribe({
-            next: () => this.toast.success(`Calificación guardada para ${alumno.nombresEstudiante}`),
-            error: () => this.toast.warning(`Estado actualizado, pero hubo un error con el registro numérico.`)
+    this.nuevaEval.id_grupo = grupo.id_grupo;
+    this.docenteService.getEvaluacionesGrupo(grupo.id_grupo).subscribe((evals: any[]) => {
+      this.evaluacionesGrupo = evals;
+      this.docenteService.getNotas().subscribe((todasNotas: any[]) => {
+        const inscripcionesDelGrupo = this.inscripciones.filter((ins: any) => ins.id_grupo === grupo.id_grupo);
+        this.listaAlumnosGrupo = inscripcionesDelGrupo.map((ins: any) => {
+          const estudiante = this.estudiantes.find((e: any) => e.id_usuario === ins.id_estudiante);
+          let notasEst: any = {}; let notaFin = 0;
+          this.evaluacionesGrupo.forEach((ev: any) => {
+            const notaDb = todasNotas.find((n: any) => n.id_inscripcion === ins.id_inscripcion && n.id_evaluacion === ev.id_evaluacion);
+            notasEst[ev.id_evaluacion] = notaDb ? notaDb.nota : 0;
+            notaFin += (notasEst[ev.id_evaluacion] * (ev.peso / 100));
+          });
+          return { ...ins, codEstudiante: estudiante?.codEstudiante, nombresEstudiante: `${estudiante?.nombres} ${estudiante?.apellidos}`, notas: notasEst, notaFinal: Math.round(notaFin) };
         });
-      },
-      error: () => this.toast.error('Error al guardar.')
+        this.cambiarVista('calificador');
+        this.cdr.detectChanges();
+      });
     });
   }
 
-  // ==========================================
-  // GESTIÓN DE PERFIL Y FOTO
-  // ==========================================
-  seleccionarFoto(event: any) { this.archivoFoto = event.target.files[0]; }
+  agregarEvaluacion(): void {
+    if (!this.nuevaEval.nombre || this.nuevaEval.peso <= 0) return this.toast.warning('Datos inválidos');
+    this.nuevaEval.fecha = new Date().toISOString().split('T')[0];
+    this.docenteService.crearEvaluacion(this.nuevaEval).subscribe((res) => {
+      this.evaluacionesGrupo.push(res);
+      this.nuevaEval.nombre = ''; this.nuevaEval.peso = 0;
+      this.cdr.detectChanges();
+    });
+  }
 
-  subirFoto() {
-    if (!this.archivoFoto) return;
+  eliminarEvaluacion(id: number): void {
+    this.docenteService.eliminarEvaluacion(id).subscribe(() => {
+      this.evaluacionesGrupo = this.evaluacionesGrupo.filter(e => e.id_evaluacion !== id);
+      this.cdr.detectChanges();
+    });
+  }
+
+  guardarNotaCelda(alumno: any, id_ev: number): void {
+    this.docenteService.guardarNotaEval({ id_inscripcion: alumno.id_inscripcion, id_evaluacion: id_ev, nota: alumno.notas[id_ev] }).subscribe(() => {
+       this.recalcularNotaFinal(alumno);
+    });
+  }
+
+  recalcularNotaFinal(alumno: any): void {
+    let suma = 0;
+    this.evaluacionesGrupo.forEach((ev: any) => { suma += (alumno.notas[ev.id_evaluacion] || 0) * (ev.peso / 100); });
+    alumno.notaFinal = Math.round(suma);
+    alumno.estado = alumno.notaFinal >= 51 ? 'Aprobado' : 'Reprobado';
+    this.docenteService.actualizarEstadoInscripcion(alumno.id_inscripcion, { estado: alumno.estado }).subscribe();
+  }
+
+  // --- NUEVO: GENERACIÓN DE ACTA PDF ---
+  descargarActaPDF() {
+    if (!this.grupoSeleccionado || this.listaAlumnosGrupo.length === 0) {
+      return this.toast.warning('No hay alumnos para generar el acta.');
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('ACTA DE CALIFICACIONES FINALES', 14, 20);
+    
+    doc.setFontSize(11);
+    doc.text(`Asignatura: ${this.grupoSeleccionado.nombreMateria} (Grupo ${this.grupoSeleccionado.seccion})`, 14, 30);
+    doc.text(`Docente: ${this.usuarioActual.nombres} ${this.usuarioActual.apellidos}`, 14, 36);
+    doc.text(`Periodo: ${this.grupoSeleccionado.id_periodo}`, 14, 42); // Puedes ajustar si tienes el nombre del periodo
+    doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString()}`, 14, 48);
+
+    const data = this.listaAlumnosGrupo.map(al => [
+      al.codEstudiante,
+      al.nombresEstudiante,
+      al.notaFinal,
+      al.estado
+    ]);
+    
+    autoTable(doc, {
+      head: [['Matrícula', 'Nombre del Estudiante', 'Nota Final', 'Estado']],
+      body: data,
+      startY: 55,
+      theme: 'grid',
+      headStyles: { fillColor: [13, 110, 253] } // Color Primary Bootstrap
+    });
+
+    // Agregar zona de firmas al final
+    const finalY = (doc as any).lastAutoTable.finalY || 55;
+    doc.text('_______________________', 40, finalY + 40);
+    doc.text('Firma del Docente', 45, finalY + 46);
+
+    doc.text('_______________________', 130, finalY + 40);
+    doc.text('Firma Dirección', 135, finalY + 46);
+
+    doc.save(`Acta_Notas_${this.grupoSeleccionado.nombreMateria}_G${this.grupoSeleccionado.seccion}.pdf`);
+    this.toast.success('Acta PDF descargada correctamente');
+  }
+
+  seleccionarFoto(event: any): void { this.archivoFoto = event.target.files[0]; }
+  subirFoto(): void { 
+    if (!this.archivoFoto) return; 
     const formData = new FormData(); formData.append('file', this.archivoFoto);
-    this.http.post(`http://127.0.0.1:8000/api/usuarios/${this.usuarioActual.id_usuario}/foto`, formData).subscribe({
-      next: (res: any) => {
-        this.usuarioActual.fotoPerfil = res.fotoPerfil;
-        localStorage.setItem('usuario_actual', JSON.stringify(this.usuarioActual));
-        this.toast.success('Foto de perfil actualizada');
-      },
-      error: () => this.toast.error('Error al subir la foto')
+    this.http.post(`http://127.0.0.1:8000/api/usuarios/${this.usuarioActual.id_usuario}/foto`, formData).subscribe((res: any) => {
+      this.usuarioActual.fotoPerfil = res.fotoPerfil; localStorage.setItem('usuario_actual', JSON.stringify(this.usuarioActual));
     });
   }
-
-  actualizarPerfil() {
-    this.http.put(`http://127.0.0.1:8000/api/usuarios/${this.usuarioActual.id_usuario}/perfil`, this.perfilEdit).subscribe({
-      next: () => {
-        this.usuarioActual.direccion = this.perfilEdit.direccion;
-        this.usuarioActual.telefonoEmergencia = this.perfilEdit.telefonoEmergencia;
-        localStorage.setItem('usuario_actual', JSON.stringify(this.usuarioActual));
-        this.toast.success('Perfil actualizado correctamente');
-      },
-      error: () => this.toast.error('Error al actualizar datos')
-    });
+  actualizarPerfil(): void { 
+    this.http.put(`http://127.0.0.1:8000/api/usuarios/${this.usuarioActual.id_usuario}/perfil`, this.perfilEdit).subscribe();
   }
 }

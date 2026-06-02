@@ -20,16 +20,10 @@ class Usuario(Base):
     fechaCrea = Column(Date)
     id_rol = Column(Integer, ForeignKey("rol.id_rol"))
     tipo_usuario = Column(String)
-    
-    # NUEVOS CAMPOS DE PERFIL
     direccion = Column(String, nullable=True)
     telefonoEmergencia = Column(String, nullable=True)
     fotoPerfil = Column(String, nullable=True)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "admin",
-        "polymorphic_on": tipo_usuario,
-    }
+    __mapper_args__ = {"polymorphic_identity": "admin", "polymorphic_on": tipo_usuario}
 
 class Docente(Usuario):
     __tablename__ = "docente"
@@ -119,28 +113,17 @@ class Grupo(Base):
     id_materia = Column(Integer, ForeignKey("materia.id_materia"))
     id_docente = Column(Integer, ForeignKey("usuario.id_usuario"))
     id_periodo = Column(Integer, ForeignKey("periodo.id_periodo"))
-
-class Horario(Base):
-    __tablename__ = "horario"
-    id_horario = Column(Integer, primary_key=True, index=True)
-    id_grupo = Column(Integer, ForeignKey("grupo.id_grupo"))
-    diaSemana = Column(String)
-    horaInicio = Column(Time)
-    horaFin = Column(Time)
-    id_aula = Column(Integer, ForeignKey("aula.id_aula"))
-
-class TipoEval(Base):
-    __tablename__ = "tipoeval"
-    id_tipo_eval = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String)
-    descripcion = Column(String, nullable=True)
-    pesoDefecto = Column(Float, nullable=True)
+    
+    # NUEVOS CAMPOS INTEGRADOS
+    turno = Column(String, nullable=True)
+    id_aula = Column(Integer, ForeignKey("aula.id_aula"), nullable=True)
+    horaInicio = Column(Time, nullable=True)
+    horaFin = Column(Time, nullable=True)
 
 class Evaluacion(Base):
     __tablename__ = "evaluacion"
     id_evaluacion = Column(Integer, primary_key=True, index=True)
     id_grupo = Column(Integer, ForeignKey("grupo.id_grupo"))
-    id_tipo_eval = Column(Integer, ForeignKey("tipoeval.id_tipo_eval"))
     nombre = Column(String)
     fecha = Column(Date)
     peso = Column(Float)

@@ -6,7 +6,6 @@ import { Observable } from 'rxjs';
   providedIn: 'root'
 })
 export class DocenteService {
-  // Usamos la IP numérica para evitar bloqueos CORS
   private apiUrl = 'http://127.0.0.1:8000/api';
 
   constructor(private http: HttpClient) {}
@@ -15,14 +14,13 @@ export class DocenteService {
   getGrupos(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/grupos`); }
   getEstudiantes(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/usuarios/estudiantes`); }
   getInscripciones(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/inscripciones`); }
-
-  // Actualiza el estado de la inscripción (Ej: 'Aprobado', 'Reprobado')
-  actualizarEstadoInscripcion(idInscripcion: number, payload: any): Observable<any> { 
-    return this.http.put(`${this.apiUrl}/inscripciones/${idInscripcion}`, payload); 
-  }
-
-  // Guarda la nota numérica en la tabla Notas
-  guardarNotaFinal(nota: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/notas`, nota);
-  }
+  actualizarEstadoInscripcion(id: number, data: any): Observable<any> { return this.http.put(`${this.apiUrl}/inscripciones/${id}`, data); }
+  
+  // --- EVALUACIONES DINÁMICAS ---
+  getEvaluacionesGrupo(idGrupo: number): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/evaluaciones/grupo/${idGrupo}`); }
+  crearEvaluacion(evaluacion: any): Observable<any> { return this.http.post(`${this.apiUrl}/evaluaciones`, evaluacion); }
+  eliminarEvaluacion(id: number): Observable<any> { return this.http.delete(`${this.apiUrl}/evaluaciones/${id}`); }
+  
+  getNotas(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/notas`); }
+  guardarNotaEval(nota: any): Observable<any> { return this.http.post(`${this.apiUrl}/notas/evaluacion`, nota); }
 }

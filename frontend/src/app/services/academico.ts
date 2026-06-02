@@ -11,7 +11,6 @@ export class AcademicoService {
   constructor(private http: HttpClient) {}
 
   getRoles(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/roles`); }
-  
   getDocentes(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/usuarios/docentes`); }
   crearDocente(docente: any): Observable<any> { return this.http.post(`${this.apiUrl}/usuarios/docentes`, docente); }
   actualizarDocente(id: number, docente: any): Observable<any> { return this.http.put(`${this.apiUrl}/usuarios/docentes/${id}`, docente); }
@@ -24,16 +23,21 @@ export class AcademicoService {
 
   getMaterias(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/materias`); }
   crearMateria(materia: any): Observable<any> { return this.http.post(`${this.apiUrl}/materias`, materia); }
+  actualizarMateria(id: number, materia: any): Observable<any> { return this.http.put(`${this.apiUrl}/materias/${id}`, materia); }
   eliminarMateria(id: number): Observable<any> { return this.http.delete(`${this.apiUrl}/materias/${id}`); }
   
-  // --- PREREQUISITOS ---
   crearPrerequisito(datos: any): Observable<any> { return this.http.post(`${this.apiUrl}/materias/prerequisitos`, datos); }
   eliminarPrerequisito(idMat: number, idPre: number): Observable<any> { return this.http.delete(`${this.apiUrl}/materias/prerequisitos/${idMat}/${idPre}`); }
   
   getGrupos(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/grupos`); }
   crearGrupo(grupo: any): Observable<any> { return this.http.post(`${this.apiUrl}/grupos`, grupo); }
+  actualizarGrupo(id: number, grupo: any): Observable<any> { return this.http.put(`${this.apiUrl}/grupos/${id}`, grupo); }
   eliminarGrupo(id: number): Observable<any> { return this.http.delete(`${this.apiUrl}/grupos/${id}`); }
 
   getPeriodos(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/periodos`); }
+  
   getAulas(): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/aulas`); }
+  crearAula(aula: any): Observable<any> { return this.http.post(`${this.apiUrl}/aulas`, aula); }
+  actualizarAula(id: number, aula: any): Observable<any> { return this.http.put(`${this.apiUrl}/aulas/${id}`, aula); }
+  eliminarAula(id: number): Observable<any> { return this.http.delete(`${this.apiUrl}/aulas/${id}`); }
 }
