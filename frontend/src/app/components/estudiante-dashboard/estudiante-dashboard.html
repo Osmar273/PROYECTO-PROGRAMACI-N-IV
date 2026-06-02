@@ -1,0 +1,101 @@
+<div class="dashboard-wrapper">
+    <div class="sidebar-overlay" *ngIf="sidebarAbierto" (click)="toggleSidebar()"></div>
+
+    <nav class="sidebar bg-success text-white" [class.sidebar-open]="sidebarAbierto">
+        <div class="sidebar-header p-3 border-bottom border-light text-center">
+            <img [src]="usuarioActual.fotoPerfil || 'assets/default-avatar.png'" alt="Perfil" class="rounded-circle mb-2 border border-2 border-white" style="width: 80px; height: 80px; object-fit: cover;">
+            <h6 class="fw-bold m-0">{{ usuarioActual.nombres }}</h6>
+            <small class="text-light">Estudiante</small>
+            <button class="btn btn-sm btn-outline-light d-md-none position-absolute top-0 end-0 m-2" (click)="toggleSidebar()">✕</button>
+        </div>
+        <ul class="nav flex-column p-2 mt-2 gap-1">
+            <li class="nav-item"><a class="nav-link text-white cursor-pointer" (click)="cambiarVista('oferta')" [ngClass]="{'bg-dark bg-opacity-25 rounded fw-bold': vistaActual === 'oferta'}">📚 Oferta Académica</a></li>
+            <li class="nav-item"><a class="nav-link text-white cursor-pointer" (click)="cambiarVista('mis-materias')" [ngClass]="{'bg-dark bg-opacity-25 rounded fw-bold': vistaActual === 'mis-materias'}">📝 Mis Materias</a></li>
+            <li class="nav-item"><a class="nav-link text-white cursor-pointer" (click)="cambiarVista('perfil')" [ngClass]="{'bg-dark bg-opacity-25 rounded fw-bold': vistaActual === 'perfil'}">👤 Mi Perfil</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content bg-light">
+        <header class="top-bar d-flex justify-content-between align-items-center p-3 bg-white shadow-sm mb-4">
+            <button class="btn btn-sm btn-outline-secondary d-md-none" (click)="toggleSidebar()">☰ Menú</button>
+            <h4 class="m-0 fw-bold text-success">Portal Estudiantil</h4>
+            <button class="btn btn-outline-danger btn-sm fw-bold" (click)="cerrarSesion()">Cerrar Sesión</button>
+        </header>
+
+        <div class="container-fluid px-4">
+            <div *ngIf="vistaActual === 'oferta'">
+                <h5 class="fw-bold mb-4 text-dark">Oferta de Materias - Periodo Actual</h5>
+                <div class="card shadow-sm border-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-success"><tr><th class="px-3">Sigla</th><th>Materia</th><th>Sección</th><th class="text-center">Cupos</th><th class="text-center">Acción</th></tr></thead>
+                            <tbody>
+                                <tr *ngFor="let grupo of gruposDisponibles">
+                                    <td class="px-3"><span class="badge bg-secondary">{{grupo.codigoMateria}}</span></td>
+                                    <td class="fw-bold">{{grupo.nombreMateria}}</td>
+                                    <td>Grupo {{grupo.seccion}}</td>
+                                    <td class="text-center"><span class="badge" [ngClass]="grupo.cupoDisp > 0 ? 'bg-info text-dark' : 'bg-danger'">{{grupo.cupoDisp}} / {{grupo.cupoMax}}</span></td>
+                                    <td class="text-center">
+                                        <button class="btn btn-success btn-sm fw-bold" *ngIf="grupo.cupoDisp > 0" (click)="inscribir(grupo)">Inscribirme</button>
+                                        <button class="btn btn-secondary btn-sm fw-bold" *ngIf="grupo.cupoDisp <= 0" disabled>Cupos Llenos</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div *ngIf="vistaActual === 'mis-materias'">
+                <h5 class="fw-bold mb-4 text-dark">Mi Historial Académico</h5>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <p class="text-muted">Aquí verás las materias en las que estás inscrito y tus notas finales cuando el docente las suba.</p>
+                        </div>
+                </div>
+            </div>
+
+            <div *ngIf="vistaActual === 'perfil'">
+                <h5 class="fw-bold mb-4 text-dark">Configuración de Perfil</h5>
+                <div class="row g-4">
+                    <div class="col-12 col-md-4">
+                        <div class="card shadow-sm border-0 text-center py-4">
+                            <img [src]="usuarioActual.fotoPerfil || 'assets/default-avatar.png'" alt="Perfil" class="rounded-circle mx-auto mb-3" style="width: 150px; height: 150px; object-fit: cover; border: 4px solid #198754;">
+                            <h5 class="fw-bold">{{usuarioActual.nombres}}</h5>
+                            <p class="text-muted small">CI: {{usuarioActual.ci}}</p>
+                            
+                            <div class="px-4 mt-3">
+                                <label class="form-label small fw-bold">Actualizar Foto</label>
+                                <input type="file" class="form-control form-control-sm mb-2" accept="image/*" (change)="seleccionarFoto($event)">
+                                <button class="btn btn-success btn-sm w-100 fw-bold" (click)="subirFoto()" [disabled]="!archivoFoto">Subir Foto</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-md-8">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white fw-bold">Datos Personales</div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label class="small fw-semibold text-muted">Nombres</label><input type="text" class="form-control bg-light" [value]="usuarioActual.nombres" readonly></div>
+                                    <div class="col-md-6"><label class="small fw-semibold text-muted">Apellidos</label><input type="text" class="form-control bg-light" [value]="usuarioActual.apellidos" readonly></div>
+                                    <div class="col-md-6"><label class="small fw-semibold text-muted">Correo Institucional</label><input type="text" class="form-control bg-light" [value]="usuarioActual.correo" readonly></div>
+                                    <div class="col-md-6"><label class="small fw-semibold text-muted">Carnet de Identidad</label><input type="text" class="form-control bg-light" [value]="usuarioActual.ci" readonly></div>
+                                </div>
+                                
+                                <hr class="my-4">
+                                <h6 class="fw-bold mb-3">Información de Contacto (Editable)</h6>
+                                <form (ngSubmit)="actualizarPerfil()" class="row g-3">
+                                    <div class="col-md-6"><label class="small fw-semibold">Celular Personal</label><input type="text" class="form-control" name="telefono" [(ngModel)]="perfilEdit.telefono"></div>
+                                    <div class="col-md-6"><label class="small fw-semibold">Teléfono de Emergencia</label><input type="text" class="form-control" name="emergencia" [(ngModel)]="perfilEdit.telefonoEmergencia"></div>
+                                    <div class="col-12"><label class="small fw-semibold">Dirección de Domicilio</label><input type="text" class="form-control" name="direccion" [(ngModel)]="perfilEdit.direccion"></div>
+                                    <div class="col-12 text-end mt-4"><button type="submit" class="btn btn-success fw-bold px-4">Guardar Cambios</button></div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>

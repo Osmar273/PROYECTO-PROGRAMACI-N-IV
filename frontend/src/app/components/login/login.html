@@ -1,0 +1,46 @@
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-body">
+            <div class="text-center mb-4">
+                <div class="logo-circle">
+                    <span class="fs-1">🎓</span>
+                </div>
+                <h3 class="fw-bold text-dark mb-1">U-Gestión</h3>
+                <p class="text-muted mb-0">Portal Académico Institucional</p>
+            </div>
+
+            <div class="alert alert-danger py-2 text-center small" *ngIf="mensajeError">
+                {{ mensajeError }}
+            </div>
+
+            <form (ngSubmit)="iniciarSesion()">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary small">Correo Institucional</label>
+                    <div class="input-group">
+                        <span class="input-group-text">✉️</span>
+                        <input type="email" class="form-control" name="correo" [(ngModel)]="credenciales.correo" placeholder="usuario@upds.edu.bo" required autocomplete="email">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold text-secondary small">Contraseña</label>
+                    <div class="input-group">
+                        <span class="input-group-text">🔒</span>
+                        <input [type]="mostrarPassword ? 'text' : 'password'" class="form-control" name="password" [(ngModel)]="credenciales.password" placeholder="••••••••" required autocomplete="current-password">
+                        <button type="button" class="btn btn-outline-secondary" (click)="mostrarPassword = !mostrarPassword">
+                            {{ mostrarPassword ? '🙈' : '👁️' }}
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold fs-5 shadow-sm" [disabled]="cargando">
+                    <span *ngIf="cargando" class="spinner-border spinner-border-sm me-2"></span>
+                    {{ cargando ? 'Verificando...' : 'Ingresar al Sistema' }}
+                </button>
+            </form>
+        </div>
+        <div class="login-footer text-center">
+            <small class="text-muted">Universidad Privada Domingo Savio</small>
+        </div>
+    </div>
+</div>

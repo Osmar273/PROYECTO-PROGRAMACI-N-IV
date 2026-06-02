@@ -1,0 +1,104 @@
+<div class="dashboard-wrapper">
+    <div class="sidebar-overlay" *ngIf="sidebarAbierto" (click)="toggleSidebar()"></div>
+
+    <nav class="sidebar bg-primary text-white" [class.sidebar-open]="sidebarAbierto">
+        <div class="sidebar-header p-3 border-bottom border-light text-center">
+            <img [src]="usuarioActual.fotoPerfil || 'assets/default-avatar.png'" alt="Perfil" class="rounded-circle mb-2 border border-2 border-white bg-white" style="width: 80px; height: 80px; object-fit: cover;">
+            <h6 class="fw-bold m-0">Prof. {{ usuarioActual.nombres }}</h6>
+            <small class="text-light opacity-75">Docente</small>
+            <button class="btn btn-sm btn-outline-light d-md-none position-absolute top-0 end-0 m-2" (click)="toggleSidebar()">✕</button>
+        </div>
+        <ul class="nav flex-column p-2 mt-2 gap-1">
+            <li class="nav-item"><a class="nav-link text-white cursor-pointer" (click)="cambiarVista('mis-grupos')" [ngClass]="{'bg-light bg-opacity-25 rounded fw-bold': vistaActual === 'mis-grupos' || vistaActual === 'calificador'}">📚 Mis Grupos</a></li>
+            <li class="nav-item"><a class="nav-link text-white cursor-pointer" (click)="cambiarVista('perfil')" [ngClass]="{'bg-light bg-opacity-25 rounded fw-bold': vistaActual === 'perfil'}">👤 Mi Perfil</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content bg-light">
+        <header class="top-bar d-flex justify-content-between align-items-center p-3 bg-white shadow-sm mb-4">
+            <button class="btn btn-sm btn-outline-secondary d-md-none" (click)="toggleSidebar()">☰ Menú</button>
+            <h4 class="m-0 fw-bold text-primary">Portal Docente</h4>
+            <button class="btn btn-outline-danger btn-sm fw-bold" (click)="cerrarSesion()">Cerrar Sesión</button>
+        </header>
+
+        <div class="container-fluid px-4">
+            <div *ngIf="vistaActual === 'mis-grupos'">
+                <h5 class="fw-bold mb-4 text-dark">Tus Asignaturas Activas</h5>
+                <div class="row g-4">
+                    <div class="col-12 col-md-6 col-xl-4" *ngFor="let grupo of misGrupos">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between">
+                                <span>{{grupo.codigoMateria}}</span><span>Grupo {{grupo.seccion}}</span>
+                            </div>
+                            <div class="card-body text-center py-4">
+                                <h5 class="fw-bold text-dark mb-3">{{grupo.nombreMateria}}</h5>
+                                <p class="text-muted small mb-0">Cupos: {{grupo.cupoDisp}} / {{grupo.cupoMax}}</p>
+                            </div>
+                            <div class="card-footer bg-white border-0 pb-3 px-3">
+                                <button class="btn btn-outline-primary w-100 fw-bold" (click)="abrirCalificador(grupo)">Calificar Alumnos</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div *ngIf="vistaActual === 'calificador'">
+                <button class="btn btn-sm btn-secondary mb-3 shadow-sm" (click)="cambiarVista('mis-grupos')">⬅ Volver</button>
+                <h5 class="fw-bold text-dark mb-3">Planilla: {{grupoSeleccionado?.nombreMateria}} (Grupo {{grupoSeleccionado?.seccion}})</h5>
+                <div class="card shadow-sm border-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light"><tr><th class="px-4">Matrícula</th><th>Alumno</th><th class="text-center">Estado</th><th class="text-center">Nota Final</th><th class="text-center px-4">Acción</th></tr></thead>
+                            <tbody>
+                                <tr *ngFor="let alumno of listaAlumnosGrupo">
+                                    <td class="px-4 fw-bold text-secondary">{{alumno.codEstudiante}}</td><td class="fw-semibold">{{alumno.nombresEstudiante}}</td>
+                                    <td class="text-center"><span class="badge" [ngClass]="alumno.estado === 'Aprobado' ? 'bg-success' : (alumno.estado === 'Reprobado' ? 'bg-danger' : 'bg-warning text-dark')">{{alumno.estado || 'Cursando'}}</span></td>
+                                    <td class="text-center"><input type="number" class="form-control text-center fw-bold mx-auto border-primary" style="max-width: 90px;" [(ngModel)]="alumno.notaFinalInput" min="0" max="100"></td>
+                                    <td class="text-center px-4"><button class="btn btn-primary btn-sm fw-bold w-100" (click)="guardarNota(alumno)">Subir Nota</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div *ngIf="vistaActual === 'perfil'">
+                <h5 class="fw-bold mb-4 text-dark">Configuración de Perfil</h5>
+                <div class="row g-4">
+                    <div class="col-12 col-md-4">
+                        <div class="card shadow-sm border-0 text-center py-4">
+                            <img [src]="usuarioActual.fotoPerfil || 'assets/default-avatar.png'" alt="Perfil" class="rounded-circle mx-auto mb-3" style="width: 150px; height: 150px; object-fit: cover; border: 4px solid #0d6efd;">
+                            <h5 class="fw-bold">{{usuarioActual.nombres}}</h5><p class="text-muted small">CI: {{usuarioActual.ci}}</p>
+                            <div class="px-4 mt-3">
+                                <label class="form-label small fw-bold">Actualizar Foto</label>
+                                <input type="file" class="form-control form-control-sm mb-2" accept="image/*" (change)="seleccionarFoto($event)">
+                                <button class="btn btn-primary btn-sm w-100 fw-bold" (click)="subirFoto()" [disabled]="!archivoFoto">Subir Foto</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-md-8">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white fw-bold">Datos Personales y de Contacto</div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label class="small fw-semibold text-muted">Nombres</label><input type="text" class="form-control bg-light" [value]="usuarioActual.nombres" readonly></div>
+                                    <div class="col-md-6"><label class="small fw-semibold text-muted">Apellidos</label><input type="text" class="form-control bg-light" [value]="usuarioActual.apellidos" readonly></div>
+                                    <div class="col-md-6"><label class="small fw-semibold text-muted">Correo</label><input type="text" class="form-control bg-light" [value]="usuarioActual.correo" readonly></div>
+                                    <div class="col-md-6"><label class="small fw-semibold text-muted">Especialidad</label><input type="text" class="form-control bg-light" [value]="usuarioActual.especialidad" readonly></div>
+                                </div>
+                                <hr class="my-4">
+                                <h6 class="fw-bold mb-3">Contacto de Emergencia (Editable)</h6>
+                                <form (ngSubmit)="actualizarPerfil()" class="row g-3">
+                                    <div class="col-md-6"><label class="small fw-semibold">Teléfono de Emergencia</label><input type="text" class="form-control" name="emergencia" [(ngModel)]="perfilEdit.telefonoEmergencia"></div>
+                                    <div class="col-12"><label class="small fw-semibold">Dirección Domicilio</label><input type="text" class="form-control" name="direccion" [(ngModel)]="perfilEdit.direccion"></div>
+                                    <div class="col-12 text-end mt-4"><button type="submit" class="btn btn-primary fw-bold px-4">Guardar Cambios</button></div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
