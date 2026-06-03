@@ -48,21 +48,81 @@ def iniciar_sesion(credenciales: LoginRequest, db: Session = Depends(get_db)):
     return { "id_usuario": usuario.id_usuario, "correo": usuario.correo, "nombres": usuario.nombres, "apellidos": usuario.apellidos, "tipo_usuario": usuario.tipo_usuario, "fotoPerfil": usuario.fotoPerfil, "ci": usuario.ci, "direccion": usuario.direccion, "telefonoEmergencia": usuario.telefonoEmergencia }
 
 @app.post("/api/usuarios/{id_usuario}/foto", tags=["Perfil"])
-async def subir_foto_perfil(id_usuario: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    usuario = db.query(models.Usuario).filter(models.Usuario.id_usuario == id_usuario).first()
-    extension = file.filename.split(".")[-1]; nombre_archivo = f"user_{id_usuario}_{uuid.uuid4().hex[:5]}.{extension}"; ruta_guardado = f"static/perfiles/{nombre_archivo}"
-    with open(ruta_guardado, "wb") as buffer: shutil.copyfileobj(file.file, buffer)
-    usuario.fotoPerfil = f"http://127.0.0.1:8000/{ruta_guardado}"; db.commit(); return {"mensaje": "Foto actualizada", "fotoPerfil": usuario.fotoPerfil}
+async def subir_foto_perfil(
+    id_usuario: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    usuario = db.query(models.Usuario).filter(
+        models.Usuario.id_usuario == id_usuario
+    ).first()
+
+    if not usuario:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuario no encontrado"
+        )
+
+    extension = file.filename.split(".")[-1]
+
+    nombre_archivo = (
+        f"user_{id_usuario}_{uuid.uuid4().hex[:5]}.{extension}"
+    )
+
+    ruta_guardado = f"static/perfiles/{nombre_archivo}"
+
+    with open(ruta_guardado, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    usuario.fotoPerfil = (
+        f"http://127.0.0.1:8000/{ruta_guardado}"
+    )
+
+    db.commit()
+
+    return {
+        "mensaje": "Foto actualizada",
+        "fotoPerfil": usuario.fotoPerfil
+    }
 
 @app.put("/api/usuarios/{id_usuario}/perfil", tags=["Perfil"])
-def actualizar_datos_perfil(id_usuario: int, datos: PerfilUpdate, db: Session = Depends(get_db)):
-    usuario = db.query(models.Usuario).filter(models.Usuario.id_usuario == id_usuario).first()
-    if datos.direccion is not None: usuario.direccion = datos.direccion
-    if datos.telefonoEmergencia is not None: usuario.telefonoEmergencia = datos.telefonoEmergencia
-    if usuario.tipo_usuario == 'estudiante' and datos.telefono is not None:
-        estudiante = db.query(models.Estudiante).filter(models.Estudiante.id_usuario == id_usuario).first()
-        if estudiante: estudiante.telefono = datos.telefono
-    db.commit(); return {"mensaje": "Perfil actualizado"}
+def actualizar_datos_perfil(
+    id_usuario: int,
+    datos: PerfilUpdate,
+    db: Session = Depends(get_db)
+):
+    usuario = db.query(models.Usuario).filter(
+        models.Usuario.id_usuario == id_usuario
+    ).first()
+
+    if not usuario:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuario no encontrado"
+        )
+
+    if datos.direccion is not None:
+        usuario.direccion = datos.direccion
+
+    if datos.telefonoEmergencia is not None:
+        usuario.telefonoEmergencia = datos.telefonoEmergencia
+
+    if (
+        usuario.tipo_usuario == "estudiante"
+        and datos.telefono is not None
+    ):
+        estudiante = db.query(models.Estudiante).filter(
+            models.Estudiante.id_usuario == id_usuario
+        ).first()
+
+        if estudiante:
+            estudiante.telefono = datos.telefono
+
+    db.commit()
+
+    return {
+        "mensaje": "Perfil actualizado"
+    }
 
 @app.get("/api/roles", response_model=List[schemas.Rol], tags=["Roles"])
 def listar_roles(db: Session = Depends(get_db)): return db.query(models.Rol).all()
@@ -77,12 +137,43 @@ def registrar_docente(docente: schemas.DocenteCreate, db: Session = Depends(get_
 @app.get("/api/usuarios/docentes", response_model=List[schemas.Docente], tags=["Usuarios"])
 def listar_docentes(db: Session = Depends(get_db)): return db.query(models.Docente).all()
 
-@app.put("/api/usuarios/docentes/{id_docente}", response_model=schemas.Docente, tags=["Usuarios"])
-def actualizar_docente(id_docente: int, docente: schemas.DocenteCreate, db: Session = Depends(get_db)):
-    doc_db = db.query(models.Docente).filter(models.Docente.id_usuario == id_docente).first()
-    doc_db.nombres = docente.nombres; doc_db.apellidos = docente.apellidos; doc_db.ci = docente.ci; doc_db.correo = docente.correo; doc_db.especialidad = docente.especialidad; doc_db.direccion = docente.direccion; doc_db.telefonoEmergencia = docente.telefonoEmergencia
-    if docente.password and docente.password.strip() != "": doc_db.password = obtener_password_hash(docente.password)
-    db.commit(); db.refresh(doc_db); return doc_db
+@app.put(
+    "/api/usuarios/docentes/{id_docente}",
+    response_model=schemas.Docente,
+    tags=["Usuarios"]
+)
+def actualizar_docente(
+    id_docente: int,
+    docente: schemas.DocenteCreate,
+    db: Session = Depends(get_db)
+):
+    doc_db = db.query(models.Docente).filter(
+        models.Docente.id_usuario == id_docente
+    ).first()
+
+    if not doc_db:
+        raise HTTPException(
+            status_code=404,
+            detail="Docente no encontrado"
+        )
+
+    doc_db.nombres = docente.nombres
+    doc_db.apellidos = docente.apellidos
+    doc_db.ci = docente.ci
+    doc_db.correo = docente.correo
+    doc_db.especialidad = docente.especialidad
+    doc_db.direccion = docente.direccion
+    doc_db.telefonoEmergencia = docente.telefonoEmergencia
+
+    if docente.password.strip() != "":
+        doc_db.password = obtener_password_hash(
+            docente.password
+        )
+
+    db.commit()
+    db.refresh(doc_db)
+
+    return doc_db
 
 @app.delete("/api/usuarios/docentes/{id_docente}", tags=["Usuarios"])
 def eliminar_docente(id_docente: int, db: Session = Depends(get_db)):
@@ -99,12 +190,44 @@ def registrar_estudiante(estudiante: schemas.EstudianteCreate, db: Session = Dep
 @app.get("/api/usuarios/estudiantes", response_model=List[schemas.Estudiante], tags=["Usuarios"])
 def listar_estudiantes(db: Session = Depends(get_db)): return db.query(models.Estudiante).all()
 
-@app.put("/api/usuarios/estudiantes/{id_estudiante}", response_model=schemas.Estudiante, tags=["Usuarios"])
-def actualizar_estudiante(id_estudiante: int, estudiante: schemas.EstudianteCreate, db: Session = Depends(get_db)):
-    est_db = db.query(models.Estudiante).filter(models.Estudiante.id_usuario == id_estudiante).first()
-    est_db.nombres = estudiante.nombres; est_db.apellidos = estudiante.apellidos; est_db.ci = estudiante.ci; est_db.correo = estudiante.correo; est_db.telefono = estudiante.telefono; est_db.genero = estudiante.genero; est_db.direccion = estudiante.direccion; est_db.telefonoEmergencia = estudiante.telefonoEmergencia
-    if estudiante.password and estudiante.password.strip() != "": est_db.password = obtener_password_hash(estudiante.password)
-    db.commit(); db.refresh(est_db); return est_db
+@app.put(
+    "/api/usuarios/estudiantes/{id_estudiante}",
+    response_model=schemas.Estudiante,
+    tags=["Usuarios"]
+)
+def actualizar_estudiante(
+    id_estudiante: int,
+    estudiante: schemas.EstudianteCreate,
+    db: Session = Depends(get_db)
+):
+    est_db = db.query(models.Estudiante).filter(
+        models.Estudiante.id_usuario == id_estudiante
+    ).first()
+
+    if not est_db:
+        raise HTTPException(
+            status_code=404,
+            detail="Estudiante no encontrado"
+        )
+
+    est_db.nombres = estudiante.nombres
+    est_db.apellidos = estudiante.apellidos
+    est_db.ci = estudiante.ci
+    est_db.correo = estudiante.correo
+    est_db.telefono = estudiante.telefono
+    est_db.genero = estudiante.genero
+    est_db.direccion = estudiante.direccion
+    est_db.telefonoEmergencia = estudiante.telefonoEmergencia
+
+    if estudiante.password.strip() != "":
+        est_db.password = obtener_password_hash(
+            estudiante.password
+        )
+
+    db.commit()
+    db.refresh(est_db)
+
+    return est_db
 
 @app.delete("/api/usuarios/estudiantes/{id_estudiante}", tags=["Usuarios"])
 def eliminar_estudiante(id_estudiante: int, db: Session = Depends(get_db)):
@@ -308,7 +431,41 @@ def actualizar_inscripcion(id_inscripcion: int, datos: InscripcionUpdate, db: Se
     inscripcion = db.query(models.Inscripcion).filter(models.Inscripcion.id_inscripcion == id_inscripcion).first()
     if datos.estado is not None: inscripcion.estado = datos.estado
     db.commit(); db.refresh(inscripcion); return inscripcion
+@app.delete(
+    "/api/inscripciones/{id_inscripcion}",
+    tags=["Transacciones"]
+)
+def eliminar_inscripcion(
+    id_inscripcion: int,
+    db: Session = Depends(get_db)
+):
+    inscripcion = db.query(
+        models.Inscripcion
+    ).filter(
+        models.Inscripcion.id_inscripcion
+        == id_inscripcion
+    ).first()
 
+    if not inscripcion:
+        raise HTTPException(
+            status_code=404,
+            detail="Inscripción no encontrada"
+        )
+
+    grupo = db.query(models.Grupo).filter(
+        models.Grupo.id_grupo == inscripcion.id_grupo
+    ).first()
+
+    if grupo:
+        grupo.cupoDisp += 1
+
+    db.delete(inscripcion)
+
+    db.commit()
+
+    return {
+        "mensaje": "Inscripción eliminada"
+    }
 # ==========================================
 # SISTEMA DE EVALUACIONES DINÁMICAS (COLUMNAS LIBRES)
 # ==========================================
@@ -335,3 +492,10 @@ def guardar_nota_celda(nota: schemas.NotaCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/notas", response_model=List[schemas.Nota], tags=["Calificaciones"])
 def listar_notas(db: Session = Depends(get_db)): return db.query(models.Nota).all()
+@app.get(
+    "/api/inscripciones",
+    response_model=List[schemas.Inscripcion],
+    tags=["Transacciones"]
+)
+def listar_inscripciones(db: Session = Depends(get_db)):
+    return db.query(models.Inscripcion).all()

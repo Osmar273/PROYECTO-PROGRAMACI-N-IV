@@ -29,6 +29,8 @@ export class EstudianteDashboard implements OnInit {
   perfilEdit: any = { direccion: '', telefonoEmergencia: '', telefono: '' };
   archivoFoto: File | null = null;
 
+  telefonoValido(tel: string): boolean { return /^[\d\s\+\-\(\)]+$/.test(tel); }
+
   constructor(
     private router: Router, 
     private estudianteService: EstudianteService, 
@@ -170,6 +172,8 @@ export class EstudianteDashboard implements OnInit {
   }
 
   actualizarPerfil(): void {
+    if (this.perfilEdit.telefono && !this.telefonoValido(this.perfilEdit.telefono)) return this.toast.warning('Celular: solo números permitidos.');
+    if (this.perfilEdit.telefonoEmergencia && !this.telefonoValido(this.perfilEdit.telefonoEmergencia)) return this.toast.warning('Tel. emergencia: solo números permitidos.');
     this.http.put(`http://127.0.0.1:8000/api/usuarios/${this.usuarioActual.id_usuario}/perfil`, this.perfilEdit).subscribe({
       next: () => {
         this.usuarioActual.direccion = this.perfilEdit.direccion; this.usuarioActual.telefonoEmergencia = this.perfilEdit.telefonoEmergencia; this.usuarioActual.telefono = this.perfilEdit.telefono;

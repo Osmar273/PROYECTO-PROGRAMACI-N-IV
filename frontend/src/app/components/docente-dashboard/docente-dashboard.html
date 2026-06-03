@@ -90,11 +90,17 @@
                                         <div class="fw-bold text-dark">{{alumno.nombresEstudiante}}</div>
                                         <small class="text-muted">{{alumno.codEstudiante}}</small>
                                     </td>
-                                    <td *ngFor="let ev of evaluacionesGrupo" class="bg-light">
-                                        <input type="number" class="form-control form-control-sm text-center fw-bold mx-auto border-0 bg-transparent shadow-none" style="max-width: 70px;" 
-                                               [(ngModel)]="alumno.notas[ev.id_evaluacion]" 
-                                               (blur)="guardarNotaCelda(alumno, ev.id_evaluacion)"
-                                               title="Se guarda automáticamente al hacer click afuera">
+                                    <td *ngFor="let ev of evaluacionesGrupo" class="bg-light align-middle">
+                                        <div class="input-group mx-auto shadow-sm" style="max-width: 120px;">
+                                            <input type="number" class="form-control text-center fw-bold fs-5 text-primary border-primary" 
+                                                   [(ngModel)]="alumno.notas[ev.id_evaluacion]" 
+                                                   min="0" max="100">
+                                            <button class="btn btn-primary px-2" type="button" 
+                                                    (click)="guardarNotaCelda(alumno, ev.id_evaluacion)"
+                                                    title="Guardar y Calcular">
+                                                ✓
+                                            </button>
+                                        </div>
                                     </td>
                                     <td class="fw-bold fs-5 bg-success bg-opacity-10" [ngClass]="alumno.notaFinal >= 51 ? 'text-success' : 'text-danger'">
                                         {{alumno.notaFinal}} <small class="fs-6 text-muted">/100</small>

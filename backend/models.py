@@ -138,7 +138,19 @@ class Inscripcion(Base):
 
 class Nota(Base):
     __tablename__ = "nota"
+
     id_nota = Column(Integer, primary_key=True, index=True)
-    id_inscripcion = Column(Integer, ForeignKey("inscripcion.id_inscripcion"))
+
+    id_inscripcion = Column(
+        Integer,
+        ForeignKey("inscripcion.id_inscripcion")
+    )
+
+    id_evaluacion = Column(
+        Integer,
+        ForeignKey("evaluacion.id_evaluacion")
+    )
+
     nota = Column(Float, nullable=True)
+
     observacion = Column(String, nullable=True)

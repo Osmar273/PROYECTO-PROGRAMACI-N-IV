@@ -29,12 +29,36 @@ export class Login {
     localStorage.removeItem('usuario_actual');
   }
 
+  soloNumeros(texto: string): boolean {
+    return /^\d+$/.test(texto);
+  }
+
+  emailValido(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  soloLetras(texto: string): boolean {
+    return /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(texto);
+  }
+
   async iniciarSesion() {
     this.credenciales.correo = this.credenciales.correo.trim();
     this.credenciales.password = this.credenciales.password.trim();
 
     if (!this.credenciales.correo || !this.credenciales.password) {
       this.mensajeError = 'Ingresa correo y contraseña.';
+      this.cdr.detectChanges();
+      return;
+    }
+
+    if (!this.emailValido(this.credenciales.correo)) {
+      this.mensajeError = 'Formato de correo inválido.';
+      this.cdr.detectChanges();
+      return;
+    }
+
+    if (this.credenciales.password.length < 4) {
+      this.mensajeError = 'La contraseña debe tener al menos 4 caracteres.';
       this.cdr.detectChanges();
       return;
     }

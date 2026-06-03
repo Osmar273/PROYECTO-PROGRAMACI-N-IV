@@ -7,7 +7,7 @@ import { Observable } from 'rxjs';
 })
 export class AuthService {
   // Esta es la ruta exacta donde vive tu backend de Python
-  private apiUrl = 'http://localhost:8000/api';
+  private apiUrl = 'http://127.0.0.1:8000/api';
 
   // Inyectamos el HttpClient que configuramos
   constructor(private http: HttpClient) {}

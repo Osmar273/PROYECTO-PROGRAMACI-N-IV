@@ -49,6 +49,11 @@ export class AdminDashboard implements OnInit {
   cambiarSubVistaUsuarios(subVista: string) { this.subVistaUsuarios = subVista; this.cdr.detectChanges(); }
   cerrarSesion() { localStorage.removeItem('usuario_actual'); this.router.navigate(['/login']); }
 
+  soloNumeros(texto: string): boolean { return /^\d+$/.test(texto); }
+  emailValido(email: string): boolean { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+  soloLetras(texto: string): boolean { return /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(texto); }
+  telefonoValido(tel: string): boolean { return /^[\d\s\+\-\(\)]+$/.test(tel); }
+
   cargarDatosGlobales() {
     this.carreraService.getCarreras().subscribe((data: any) => { this.carreras = data; this.cdr.detectChanges(); });
     this.carreraService.getFacultades().subscribe((data: any) => { this.facultades = data; this.cdr.detectChanges(); });
@@ -84,29 +89,66 @@ export class AdminDashboard implements OnInit {
 
   seleccionarFoto(event: any) { this.archivoFoto = event.target.files[0]; this.cdr.detectChanges(); }
   subirFoto() { if (!this.archivoFoto) return; const formData = new FormData(); formData.append('file', this.archivoFoto); this.http.post(`http://127.0.0.1:8000/api/usuarios/${this.usuarioActual.id_usuario}/foto`, formData).subscribe({ next: (res: any) => { this.usuarioActual.fotoPerfil = res.fotoPerfil; localStorage.setItem('usuario_actual', JSON.stringify(this.usuarioActual)); this.toast.success('Foto actualizada'); this.archivoFoto = null; this.cdr.detectChanges(); }, error: (err: any) => this.toast.error('Error al subir foto') }); }
-  actualizarPerfil() { this.http.put(`http://127.0.0.1:8000/api/usuarios/${this.usuarioActual.id_usuario}/perfil`, this.perfilEdit).subscribe({ next: (res: any) => { this.usuarioActual.direccion = this.perfilEdit.direccion; this.usuarioActual.telefonoEmergencia = this.perfilEdit.telefonoEmergencia; localStorage.setItem('usuario_actual', JSON.stringify(this.usuarioActual)); this.toast.success('Perfil actualizado'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error('Error al actualizar') }); }
+  actualizarPerfil() {
+    if (this.perfilEdit.telefonoEmergencia && !this.telefonoValido(this.perfilEdit.telefonoEmergencia)) return this.toast.warning('Tel. emergencia: solo números permitidos.');
+    this.http.put(`http://127.0.0.1:8000/api/usuarios/${this.usuarioActual.id_usuario}/perfil`, this.perfilEdit).subscribe({ next: (res: any) => { this.usuarioActual.direccion = this.perfilEdit.direccion; this.usuarioActual.telefonoEmergencia = this.perfilEdit.telefonoEmergencia; localStorage.setItem('usuario_actual', JSON.stringify(this.usuarioActual)); this.toast.success('Perfil actualizado'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error('Error al actualizar') }); }
 
   cargarEstudianteParaEdicion(e: any) { this.modoEdicionEstudiante = true; this.idEdicionEstudiante = e.id_usuario; this.nuevoEstudiante = { ...e, password: '' }; window.scrollTo({ top: 0, behavior: 'smooth' }); this.cdr.detectChanges(); }
   cancelarEdicionEstudiante() { this.modoEdicionEstudiante = false; this.idEdicionEstudiante = 0; this.nuevoEstudiante = { nombres: '', apellidos: '', ci: '', correo: '', password: '', id_rol: 3, telefono: '', telefonoEmergencia: '', direccion: '', genero: 'Masculino', fechalngreso: '', estado: true }; this.cdr.detectChanges(); }
-  guardarEstudiante() { const payload: any = { ...this.nuevoEstudiante }; if (payload.fechalngreso === '') payload.fechalngreso = null; payload.id_rol = 3; if (this.modoEdicionEstudiante) { this.academicoService.actualizarEstudiante(this.idEdicionEstudiante, payload).subscribe({ next: (res: any) => { const idx = this.estudiantes.findIndex(e => e.id_usuario === this.idEdicionEstudiante); if (idx !== -1) this.estudiantes[idx] = res; this.cancelarEdicionEstudiante(); this.toast.success('Estudiante actualizado.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.academicoService.crearEstudiante(payload).subscribe({ next: (res: any) => { this.estudiantes = [...this.estudiantes, res]; this.cancelarEdicionEstudiante(); this.toast.success('Estudiante registrado.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
+  guardarEstudiante() {
+    const e = this.nuevoEstudiante;
+    if (!this.soloLetras(e.nombres)) return this.toast.warning('Nombres: solo letras permitidas.');
+    if (!this.soloLetras(e.apellidos)) return this.toast.warning('Apellidos: solo letras permitidas.');
+    if (!this.soloNumeros(e.ci)) return this.toast.warning('CI: solo números permitidos.');
+    if (!this.emailValido(e.correo)) return this.toast.warning('Formato de correo inválido.');
+    if (!this.modoEdicionEstudiante && e.password.length < 4) return this.toast.warning('Contraseña: mínimo 4 caracteres.');
+    if (e.telefono && !this.telefonoValido(e.telefono)) return this.toast.warning('Teléfono: solo números permitidos.');
+    if (e.telefonoEmergencia && !this.telefonoValido(e.telefonoEmergencia)) return this.toast.warning('Tel. emergencia: solo números permitidos.');
+    const payload: any = { ...e }; if (payload.fechalngreso === '') payload.fechalngreso = null; payload.id_rol = 3; if (this.modoEdicionEstudiante) { this.academicoService.actualizarEstudiante(this.idEdicionEstudiante, payload).subscribe({ next: (res: any) => { const idx = this.estudiantes.findIndex(e => e.id_usuario === this.idEdicionEstudiante); if (idx !== -1) this.estudiantes[idx] = res; this.cancelarEdicionEstudiante(); this.toast.success('Estudiante actualizado.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.academicoService.crearEstudiante(payload).subscribe({ next: (res: any) => { this.estudiantes = [...this.estudiantes, res]; this.cancelarEdicionEstudiante(); this.toast.success('Estudiante registrado.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
 
   cargarDocenteParaEdicion(d: any) { this.modoEdicionDocente = true; this.idEdicionDocente = d.id_usuario; this.nuevoDocente = { ...d, password: '' }; window.scrollTo({ top: 0, behavior: 'smooth' }); this.cdr.detectChanges(); }
   cancelarEdicionDocente() { this.modoEdicionDocente = false; this.idEdicionDocente = 0; this.nuevoDocente = { nombres: '', apellidos: '', ci: '', correo: '', password: '', id_rol: 2, especialidad: '', telefonoEmergencia: '', direccion: '', fechalngreso: '', estado: true }; this.cdr.detectChanges(); }
-  guardarDocente() { const payload: any = { ...this.nuevoDocente }; if (payload.fechalngreso === '') payload.fechalngreso = null; payload.id_rol = 2; if (this.modoEdicionDocente) { this.academicoService.actualizarDocente(this.idEdicionDocente, payload).subscribe({ next: (res: any) => { const idx = this.docentes.findIndex(d => d.id_usuario === this.idEdicionDocente); if (idx !== -1) this.docentes[idx] = res; this.cancelarEdicionDocente(); this.toast.success('Docente actualizado.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.academicoService.crearDocente(payload).subscribe({ next: (res: any) => { this.docentes = [...this.docentes, res]; this.cancelarEdicionDocente(); this.toast.success('Docente registrado.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
+  guardarDocente() {
+    const d = this.nuevoDocente;
+    if (!this.soloLetras(d.nombres)) return this.toast.warning('Nombres: solo letras permitidas.');
+    if (!this.soloLetras(d.apellidos)) return this.toast.warning('Apellidos: solo letras permitidas.');
+    if (!this.soloNumeros(d.ci)) return this.toast.warning('CI: solo números permitidos.');
+    if (!this.emailValido(d.correo)) return this.toast.warning('Formato de correo inválido.');
+    if (!this.modoEdicionDocente && d.password.length < 4) return this.toast.warning('Contraseña: mínimo 4 caracteres.');
+    if (!this.soloLetras(d.especialidad)) return this.toast.warning('Especialidad: solo letras permitidas.');
+    if (d.telefonoEmergencia && !this.telefonoValido(d.telefonoEmergencia)) return this.toast.warning('Tel. emergencia: solo números permitidos.');
+    const payload: any = { ...d }; if (payload.fechalngreso === '') payload.fechalngreso = null; payload.id_rol = 2; if (this.modoEdicionDocente) { this.academicoService.actualizarDocente(this.idEdicionDocente, payload).subscribe({ next: (res: any) => { const idx = this.docentes.findIndex(d => d.id_usuario === this.idEdicionDocente); if (idx !== -1) this.docentes[idx] = res; this.cancelarEdicionDocente(); this.toast.success('Docente actualizado.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.academicoService.crearDocente(payload).subscribe({ next: (res: any) => { this.docentes = [...this.docentes, res]; this.cancelarEdicionDocente(); this.toast.success('Docente registrado.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
 
   cargarCarreraParaEdicion(c: any) { this.modoEdicionCarrera = true; this.idEdicionCarrera = c.id_carrera; this.nuevaCarrera = { ...c }; window.scrollTo({ top: 0, behavior: 'smooth' }); this.cdr.detectChanges(); }
   cancelarEdicionCarrera() { this.modoEdicionCarrera = false; this.idEdicionCarrera = 0; this.nuevaCarrera = { nombre: '', codigo: '', descripcion: '', id_facultad: null, id_modalidad: null, estado: true }; this.cdr.detectChanges(); }
-  guardarCarrera() { if(this.modoEdicionCarrera) { this.carreraService.actualizarCarrera(this.idEdicionCarrera, this.nuevaCarrera).subscribe({ next: (res: any) => { const idx = this.carreras.findIndex(c => c.id_carrera === this.idEdicionCarrera); if(idx !== -1) this.carreras[idx] = res; this.cancelarEdicionCarrera(); this.toast.success('Actualizada'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.carreraService.crearCarrera(this.nuevaCarrera).subscribe({ next: (res: any) => { this.carreras = [...this.carreras, res]; this.cancelarEdicionCarrera(); this.toast.success('Registrada'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
+  guardarCarrera() {
+    if (!this.nuevaCarrera.nombre.trim()) return this.toast.warning('El nombre de la carrera es obligatorio.');
+    if (!this.nuevaCarrera.codigo.trim()) return this.toast.warning('El código de la carrera es obligatorio.');
+    if (!this.nuevaCarrera.id_facultad) return this.toast.warning('Selecciona una facultad.');
+    if (!this.nuevaCarrera.id_modalidad) return this.toast.warning('Selecciona una modalidad.');
+    if(this.modoEdicionCarrera) { this.carreraService.actualizarCarrera(this.idEdicionCarrera, this.nuevaCarrera).subscribe({ next: (res: any) => { const idx = this.carreras.findIndex(c => c.id_carrera === this.idEdicionCarrera); if(idx !== -1) this.carreras[idx] = res; this.cancelarEdicionCarrera(); this.toast.success('Actualizada'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.carreraService.crearCarrera(this.nuevaCarrera).subscribe({ next: (res: any) => { this.carreras = [...this.carreras, res]; this.cancelarEdicionCarrera(); this.toast.success('Registrada'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
 
   cargarMateriaParaEdicion(m: any) { this.modoEdicionMateria = true; this.idEdicionMateria = m.id_materia; this.nuevaMateria = { ...m }; window.scrollTo({ top: 0, behavior: 'smooth' }); this.cdr.detectChanges(); }
   cancelarEdicionMateria() { this.modoEdicionMateria = false; this.idEdicionMateria = 0; this.nuevaMateria = { nombre: '', codigo: '', nivel: 1, id_carrera: null, estado: true }; this.cdr.detectChanges(); }
-  guardarMateria() { if(this.modoEdicionMateria) { this.academicoService.actualizarMateria(this.idEdicionMateria, this.nuevaMateria).subscribe({ next: (res: any) => { const idx = this.materias.findIndex(m => m.id_materia === this.idEdicionMateria); if(idx !== -1) this.materias[idx] = res; this.cancelarEdicionMateria(); this.toast.success('Actualizada'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.academicoService.crearMateria(this.nuevaMateria).subscribe({ next: (res: any) => { this.materias = [...this.materias, res]; this.cancelarEdicionMateria(); this.toast.success('Registrada'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
+  guardarMateria() {
+    if (!this.nuevaMateria.nombre.trim()) return this.toast.warning('El nombre de la materia es obligatorio.');
+    if (!this.nuevaMateria.codigo.trim()) return this.toast.warning('El código de la materia es obligatorio.');
+    if (!this.nuevaMateria.id_carrera) return this.toast.warning('Selecciona una carrera.');
+    if(this.modoEdicionMateria) { this.academicoService.actualizarMateria(this.idEdicionMateria, this.nuevaMateria).subscribe({ next: (res: any) => { const idx = this.materias.findIndex(m => m.id_materia === this.idEdicionMateria); if(idx !== -1) this.materias[idx] = res; this.cancelarEdicionMateria(); this.toast.success('Actualizada'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.academicoService.crearMateria(this.nuevaMateria).subscribe({ next: (res: any) => { this.materias = [...this.materias, res]; this.cancelarEdicionMateria(); this.toast.success('Registrada'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
 
-  guardarPrerequisito() { if(this.nuevoPrerequisito.id_materia === this.nuevoPrerequisito.id_prerequisito) return this.toast.warning('No puede ser prerequisito de sí misma.'); this.academicoService.crearPrerequisito(this.nuevoPrerequisito).subscribe({ next: (res: any) => { this.toast.success('Regla guardada.'); this.nuevoPrerequisito = { id_materia: null, id_prerequisito: null }; this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); }
+  guardarPrerequisito() {
+    if (!this.nuevoPrerequisito.id_materia) return this.toast.warning('Selecciona la materia destino.');
+    if (!this.nuevoPrerequisito.id_prerequisito) return this.toast.warning('Selecciona el prerrequisito.');
+    if(this.nuevoPrerequisito.id_materia === this.nuevoPrerequisito.id_prerequisito) return this.toast.warning('No puede ser prerequisito de sí misma.');
+    this.academicoService.crearPrerequisito(this.nuevoPrerequisito).subscribe({ next: (res: any) => { this.toast.success('Regla guardada.'); this.nuevoPrerequisito = { id_materia: null, id_prerequisito: null }; this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); }
 
   cargarAulaParaEdicion(a: any) { this.modoEdicionAula = true; this.idEdicionAula = a.id_aula; this.nuevaAula = { ...a }; window.scrollTo({ top: 0, behavior: 'smooth' }); this.cdr.detectChanges(); }
   cancelarEdicionAula() { this.modoEdicionAula = false; this.idEdicionAula = 0; this.nuevaAula = { nombre: '', edificio: '', capacidad: 40, tipo: 'Teoría' }; this.cdr.detectChanges(); }
-  guardarAula() { if(this.modoEdicionAula) { this.academicoService.actualizarAula(this.idEdicionAula, this.nuevaAula).subscribe({ next: (res: any) => { const idx = this.aulas.findIndex(a => a.id_aula === this.idEdicionAula); if(idx !== -1) this.aulas[idx] = res; this.cancelarEdicionAula(); this.toast.success('Aula actualizada.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.academicoService.crearAula(this.nuevaAula).subscribe({ next: (res: any) => { this.aulas = [...this.aulas, res]; this.cancelarEdicionAula(); this.toast.success('Aula registrada.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
+  guardarAula() {
+    if (!this.nuevaAula.nombre.trim()) return this.toast.warning('El nombre del aula es obligatorio.');
+    if (!this.nuevaAula.edificio.trim()) return this.toast.warning('El edificio es obligatorio.');
+    if (this.nuevaAula.capacidad < 1) return this.toast.warning('La capacidad debe ser al menos 1.');
+    if(this.modoEdicionAula) { this.academicoService.actualizarAula(this.idEdicionAula, this.nuevaAula).subscribe({ next: (res: any) => { const idx = this.aulas.findIndex(a => a.id_aula === this.idEdicionAula); if(idx !== -1) this.aulas[idx] = res; this.cancelarEdicionAula(); this.toast.success('Aula actualizada.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } else { this.academicoService.crearAula(this.nuevaAula).subscribe({ next: (res: any) => { this.aulas = [...this.aulas, res]; this.cancelarEdicionAula(); this.toast.success('Aula registrada.'); this.cdr.detectChanges(); }, error: (err: any) => this.toast.error(this.procesarError(err)) }); } }
 
   // --- CRUD GRUPO CON TODO ---
   cargarGrupoParaEdicion(g: any) { 
@@ -120,6 +162,12 @@ export class AdminDashboard implements OnInit {
   cancelarEdicionGrupo() { this.modoEdicionGrupo = false; this.idEdicionGrupo = 0; this.nuevoGrupo = { seccion: '', cupoMax: 40, id_materia: null, id_periodo: null, id_docente: null, turno: 'Mañana', id_aula: null, horaInicio: '08:00', horaFin: '10:00', estado: true }; this.cdr.detectChanges(); }
   
   guardarGrupo() { 
+    if (!this.nuevoGrupo.id_materia) return this.toast.warning('Selecciona una materia.');
+    if (!this.nuevoGrupo.id_docente) return this.toast.warning('Selecciona un docente.');
+    if (!this.nuevoGrupo.id_periodo) return this.toast.warning('Selecciona un periodo.');
+    if (!this.nuevoGrupo.seccion.trim()) return this.toast.warning('La sección es obligatoria.');
+    if (this.nuevoGrupo.cupoMax < 1) return this.toast.warning('El cupo máximo debe ser al menos 1.');
+    if (!this.nuevoGrupo.horaInicio || !this.nuevoGrupo.horaFin) return this.toast.warning('Las horas de inicio y fin son obligatorias.');
     const payload: any = { ...this.nuevoGrupo };
     if (payload.horaInicio.length === 5) payload.horaInicio += ':00';
     if (payload.horaFin.length === 5) payload.horaFin += ':00';

@@ -59,7 +59,16 @@ export class DocenteDashboard implements OnInit {
     this.docenteService.getMaterias().subscribe((mat: any[]) => {
       this.materias = mat;
       this.docenteService.getGrupos().subscribe((grupos: any[]) => {
-        this.misGrupos = grupos.filter((g: any) => Number(g.id_docente) === Number(this.usuarioActual.id_usuario));
+        this.misGrupos = grupos
+          .filter((g: any) => Number(g.id_docente) === Number(this.usuarioActual.id_usuario))
+          .map((g: any) => {
+            const materiaEncontrada = this.materias.find(m => Number(m.id_materia) === Number(g.id_materia));
+            return {
+              ...g,
+              nombreMateria: materiaEncontrada ? materiaEncontrada.nombre : 'Sin nombre',
+              codigoMateria: materiaEncontrada ? materiaEncontrada.codigo : 'N/A'
+            };
+          });
         this.cdr.detectChanges();
       });
     });
@@ -67,7 +76,7 @@ export class DocenteDashboard implements OnInit {
     this.docenteService.getInscripciones().subscribe((ins: any[]) => { this.inscripciones = ins; });
   }
 
-  getNombreAula(idAula: number): string { const au = this.aulas.find((a: any) => a.id_aula === idAula); return au ? au.nombre : 'Sin Aula'; }
+  getNombreAula(idAula: number): string { const au = this.aulas.find((a: any) => Number(a.id_aula) === Number(idAula)); return au ? au.nombre : 'Sin Aula'; }
   get pesoTotal(): number { return this.evaluacionesGrupo.reduce((acc: number, ev: any) => acc + ev.peso, 0); }
 
   abrirCalificador(grupo: any): void {
@@ -75,20 +84,32 @@ export class DocenteDashboard implements OnInit {
     this.nuevaEval.id_grupo = grupo.id_grupo;
     this.docenteService.getEvaluacionesGrupo(grupo.id_grupo).subscribe((evals: any[]) => {
       this.evaluacionesGrupo = evals;
-      this.docenteService.getNotas().subscribe((todasNotas: any[]) => {
-        const inscripcionesDelGrupo = this.inscripciones.filter((ins: any) => ins.id_grupo === grupo.id_grupo);
-        this.listaAlumnosGrupo = inscripcionesDelGrupo.map((ins: any) => {
-          const estudiante = this.estudiantes.find((e: any) => e.id_usuario === ins.id_estudiante);
-          let notasEst: any = {}; let notaFin = 0;
-          this.evaluacionesGrupo.forEach((ev: any) => {
-            const notaDb = todasNotas.find((n: any) => n.id_inscripcion === ins.id_inscripcion && n.id_evaluacion === ev.id_evaluacion);
-            notasEst[ev.id_evaluacion] = notaDb ? notaDb.nota : 0;
-            notaFin += (notasEst[ev.id_evaluacion] * (ev.peso / 100));
+      
+      this.docenteService.getInscripciones().subscribe((todasIns: any[]) => {
+        this.inscripciones = todasIns;
+        
+        this.docenteService.getNotas().subscribe((todasNotas: any[]) => {
+          const inscripcionesDelGrupo = this.inscripciones.filter((ins: any) => Number(ins.id_grupo) === Number(grupo.id_grupo));
+          
+          this.listaAlumnosGrupo = inscripcionesDelGrupo.map((ins: any) => {
+            const estudiante = this.estudiantes.find((e: any) => Number(e.id_usuario) === Number(ins.id_estudiante));
+            let notasEst: any = {}; let notaFin = 0;
+            this.evaluacionesGrupo.forEach((ev: any) => {
+              const notaDb = todasNotas.find((n: any) => Number(n.id_inscripcion) === Number(ins.id_inscripcion) && Number(n.id_evaluacion) === Number(ev.id_evaluacion));
+              notasEst[ev.id_evaluacion] = notaDb ? notaDb.nota : 0;
+              notaFin += (notasEst[ev.id_evaluacion] * (ev.peso / 100));
+            });
+            return { 
+              ...ins, 
+              codEstudiante: estudiante?.codEstudiante || 'N/A', 
+              nombresEstudiante: estudiante ? `${estudiante?.nombres} ${estudiante?.apellidos}` : 'Desconocido', 
+              notas: notasEst, 
+              notaFinal: Math.round(notaFin) 
+            };
           });
-          return { ...ins, codEstudiante: estudiante?.codEstudiante, nombresEstudiante: `${estudiante?.nombres} ${estudiante?.apellidos}`, notas: notasEst, notaFinal: Math.round(notaFin) };
+          this.cambiarVista('calificador');
+          this.cdr.detectChanges();
         });
-        this.cambiarVista('calificador');
-        this.cdr.detectChanges();
       });
     });
   }
@@ -113,6 +134,8 @@ export class DocenteDashboard implements OnInit {
   guardarNotaCelda(alumno: any, id_ev: number): void {
     this.docenteService.guardarNotaEval({ id_inscripcion: alumno.id_inscripcion, id_evaluacion: id_ev, nota: alumno.notas[id_ev] }).subscribe(() => {
        this.recalcularNotaFinal(alumno);
+       this.toast.success('Nota guardada y calculada correctamente');
+       this.cdr.detectChanges();
     });
   }
 
@@ -124,7 +147,6 @@ export class DocenteDashboard implements OnInit {
     this.docenteService.actualizarEstadoInscripcion(alumno.id_inscripcion, { estado: alumno.estado }).subscribe();
   }
 
-  // --- NUEVO: GENERACIÓN DE ACTA PDF ---
   descargarActaPDF() {
     if (!this.grupoSeleccionado || this.listaAlumnosGrupo.length === 0) {
       return this.toast.warning('No hay alumnos para generar el acta.');
@@ -137,7 +159,7 @@ export class DocenteDashboard implements OnInit {
     doc.setFontSize(11);
     doc.text(`Asignatura: ${this.grupoSeleccionado.nombreMateria} (Grupo ${this.grupoSeleccionado.seccion})`, 14, 30);
     doc.text(`Docente: ${this.usuarioActual.nombres} ${this.usuarioActual.apellidos}`, 14, 36);
-    doc.text(`Periodo: ${this.grupoSeleccionado.id_periodo}`, 14, 42); // Puedes ajustar si tienes el nombre del periodo
+    doc.text(`Periodo: ${this.grupoSeleccionado.id_periodo}`, 14, 42); 
     doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString()}`, 14, 48);
 
     const data = this.listaAlumnosGrupo.map(al => [
@@ -152,10 +174,9 @@ export class DocenteDashboard implements OnInit {
       body: data,
       startY: 55,
       theme: 'grid',
-      headStyles: { fillColor: [13, 110, 253] } // Color Primary Bootstrap
+      headStyles: { fillColor: [13, 110, 253] } 
     });
 
-    // Agregar zona de firmas al final
     const finalY = (doc as any).lastAutoTable.finalY || 55;
     doc.text('_______________________', 40, finalY + 40);
     doc.text('Firma del Docente', 45, finalY + 46);
